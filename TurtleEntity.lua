@@ -15,12 +15,19 @@ local function parseStringVector(str)
 end
 local function getTurtle(id) return turtles[id] end
 local function runTurtleCommand(turtle, command)
+    if command==nil then return "No command passed" end
     --Verify turtle exists
-    --return "Output from command \""..dump(command).."\"".." at location \""..dump(pos).."\""
-    local loadUserCommand = loadstring(command)
     --TODO learn how to do this using loadstring, then eventually replace this with some kinda lua sandbox like https://github.com/APItools/sandbox.lua
+    command = "function init(turtle) "..command.." end"
+    minetest.log("COMMAND IS \""..command.."\"")
+    local loadUserCommand = loadstring(command)
+
     loadUserCommand()
-    someUserDefinedFunctionLikeInit(turtle)
+    init(turtle)
+    turtle:turnLeft()
+
+
+    --return "Output from command \""..dump(command).."\"".." at location \""..dump(pos).."\""
     --if command=="forward" then if moveForward(turtle) then return "Went forward" else return "Stopped by Obstacle" end
     --elseif command=="left" then
     --    turnLeft(turtle)
@@ -128,9 +135,9 @@ minetest.register_entity("computertest:turtle", {
     ---@returns true on success
     ---
     turtle_move_withHeading = function (turtle,numForward,numRight,numUp)
-        minetest.log("YAW"..dump(turtle.object:get_yaw()))
-        minetest.log("NUMFORWARD"..dump(numForward))
-        minetest.log("NUMRIGHT"..dump(numRight))
+        --minetest.log("YAW"..dump(turtle.object:get_yaw()))
+        --minetest.log("NUMFORWARD"..dump(numForward))
+        --minetest.log("NUMRIGHT"..dump(numRight))
         local pos = turtle.object:get_pos()
         local new_pos = vector.new(pos)
         if turtle:get_heading()%4==0 then new_pos.z=pos.z-numForward;new_pos.x=pos.x-numRight; end
@@ -163,4 +170,14 @@ minetest.register_entity("computertest:turtle", {
         if not clicker or not clicker:is_player() then return end
         minetest.show_formspec(clicker:get_player_name(), FORMNAME_TURTLE_INVENTORY..self.id, get_formspec_inventory(self))
     end,
+--    MAIN TURTLE INTERFACE
+--    TODO move this to a literal OO interface wrapper thingy
+    moveForward = function(turtle) turtle:turtle_move_withHeading( 1, 0, 0) end,
+    moveBackward = function(turtle) turtle:turtle_move_withHeading(-1, 0, 0) end,
+    moveRight = function(turtle) turtle:turtle_move_withHeading( 0, 1, 0) end,
+    moveLeft = function(turtle) turtle:turtle_move_withHeading( 0,-1, 0) end,
+    moveUp = function(turtle) turtle:turtle_move_withHeading( 0, 0, 1) end,
+    moveDown = function(turtle) turtle:turtle_move_withHeading( 0, 0,-1) end,
+    turnLeft = function(turtle) turtle:set_heading(turtle:get_heading()+1) end,
+    turnRight = function(turtle) turtle:set_heading(turtle:get_heading()-1) end,
 })
