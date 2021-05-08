@@ -6,15 +6,5 @@ computertest = {
     num_turtles = 0,
 }
 local modpath = minetest.get_modpath("computertest")
-dofile(modpath.."/Block/Turtle.lua")
-dofile(modpath.."/TurtleEntity.lua")
-dofile(modpath.."/TurtleInterface.lua")
-dofile(modpath.."/Sandbox.lua")
-
-
-
-
-
-
-
-
+dofile(modpath.."/block/turtle.lua")
+dofile(modpath.."/entity/turtle.lua")

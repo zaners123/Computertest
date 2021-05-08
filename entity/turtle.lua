@@ -11,19 +11,15 @@ local function sandbox(codeString)
 end
 
 local function getTurtle(id) return computertest.turtles[id] end
-local function runTurtleCommand(turtle, command)
-    if command==nil or command=="" then return nil end
-    --TODO eventually replace this with some kinda lua sandbox
-    command = "function init(turtle) return "..command.." end"
-    minetest.log("COMMAND IS \""..command.."\"")
-    sandbox(command)()
-    local res = init(turtle)
-    if (res==nil) then
-        return "Returned nil"
-    elseif (type(res)=="string") then
-        return res
+local function upload_code_to_turtle(turtle, code_string,run_for_result)
+    turtle.codeUncompiled = code_string
+    turtle.code = sandbox(turtle.codeUncompiled)
+    if (run_for_result) then
+        --TODO run subroutine once, if it returns a value, return that here
+        return "Ran"
     end
-    return "Done. Didn't return string."
+
+    return turtle.code ~= nil
 end
 local function get_formspec_inventory(self)
     return "size[12,5;]"
@@ -58,7 +54,6 @@ local function get_formspec_upload(turtle)
             .."set_focus[upload;true]"
     ;
 end
-
 minetest.register_on_player_receive_fields(function(player, formname, fields)
     local function isForm(name)
         return string.sub(formname,1,string.len(name))==name
@@ -77,7 +72,10 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         local id = tonumber(string.sub(formname,1+string.len(FORMNAME_TURTLE_TERMINAL)))
         local turtle = getTurtle(id)
         turtle.lastCommandRan = fields.terminal_in
-        local commandResult = runTurtleCommand(turtle, fields.terminal_in)
+        local command = fields.terminal_in
+        if command==nil or command=="" then return nil end
+        command = "function init(turtle) return "..command.." end"
+        local commandResult = upload_code_to_turtle(turtle, command, true)
         if (commandResult==nil) then
             minetest.close_formspec(player:get_player_name(),FORMNAME_TURTLE_TERMINAL..id)
             return true
@@ -89,11 +87,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         local id = tonumber(string.sub(formname,1+string.len(FORMNAME_TURTLE_UPLOAD)))
         if (fields.button_upload == nil or fields.upload == nil) then return true end
         local turtle = getTurtle(id)
-        --minetest.debug("CODE UPLOADED, NEAT",dump(id),dump(formname),dump(fields),dump(turtle))
-        turtle.codeUncompiled = fields.upload
-        turtle.code = sandbox(turtle.codeUncompiled)
-        if turtle.code==nil then return true end--Given malformed code
-    --    This turtle.code is used later
+        return not upload_code_to_turtle(turtle, fields.upload,false)
     else
         return false--Unknown formname, input not processed
     end
@@ -163,9 +157,6 @@ minetest.register_entity("computertest:turtle", {
     ---@returns true on success
     ---
     turtle_move_withHeading = function (turtle,numForward,numRight,numUp)
-        --minetest.log("YAW"..dump(turtle.object:get_yaw()))
-        --minetest.log("NUMFORWARD"..dump(numForward))
-        --minetest.log("NUMRIGHT"..dump(numRight))
         local new_pos = turtle:getNearbyPos(numForward,numRight,numUp)
         --Verify new pos is empty
         if (minetest.get_node(new_pos).name~="air") then
@@ -189,8 +180,9 @@ minetest.register_entity("computertest:turtle", {
     end,
     mine = function(turtle, nodeLocation)
         local node = minetest.get_node(nodeLocation)
+        if (node.name=="air") then return false end
         local drops = minetest.get_node_drops(node)
-
+        minetest.remove_node(nodeLocation)
         for _, itemname in ipairs(drops) do
             local stack = ItemStack(itemname)
             --TODO This doesn't actually need to drop-then-undrop the item for no reason
@@ -208,16 +200,16 @@ minetest.register_entity("computertest:turtle", {
                 end
             end
         end
-
-        minetest.remove_node(nodeLocation)
         turtle:yield("Mining")
-
+        return true
     end,
 --    MAIN TURTLE INTERFACE    ---------------------------------------
---    TODO put turtle interface into a stack, so the turtle can't immediately mine hundreds of blocks (only one mine per second and move two blocks per second or something)
-    --    Wouldn't work since the player couldn't use stateful functions such as getting the fuel level
---    TODO The TurtleEntity thread would need to pause itself after calling any of these functions. This pause would then return state back to the
---    TODO move this to a literal OO interface wrapper thingy
+    interface = {
+        yield,
+        moveForward, moveBackward, moveRight, moveLeft, moveUp, moveDown,
+        turnLeft, turnRight,
+        mineForward, mineUp, mineDown,
+    },
     yield = function(turtle,reason) if (coroutine.running() == turtle.coroutine) then coroutine.yield(reason) end end,
     moveForward = function(turtle)  turtle:turtle_move_withHeading( 1, 0, 0) end,
     moveBackward = function(turtle) turtle:turtle_move_withHeading(-1, 0, 0) end,
@@ -237,7 +229,7 @@ local timer = 0
 minetest.register_globalstep(function(dtime)
     timer = timer + dtime
     if (timer >= computertest.config.globalstep_interval) then
-        for id,turtle in pairs(computertest.turtles) do
+        for _,turtle in pairs(computertest.turtles) do
             if turtle.coroutine then
                 if coroutine.status(turtle.coroutine)=="dead" then
                     --minetest.log("turtle #"..id.." has coroutine, but it's already done running")

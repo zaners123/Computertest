@@ -1,3 +1,6 @@
+--[[
+    The turtle block is only used to spawn the turtle entity, then it deletes itself
+]]
 minetest.register_node("computertest:turtle", {
     tiles = {
         "computertest_top.png",
