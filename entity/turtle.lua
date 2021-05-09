@@ -199,30 +199,23 @@ minetest.register_entity("computertest:turtle", {
         end
         return suckedEverything
     end,
-    --[[    Sucks drops from ground (from mining, spitting out, etc) at nodeLocation into turtle
-    @returns true if it sucked everything up]]
-    suckDrops = function(turtle, nodeLocation)
-        local drops = minetest.get_objects_inside_radius(nodeLocation,1)
-        for i,drop in pairs(drops) do
-            if drop.get_luaentity then
-                --TODO this doesn't seem to be possible
-                --minetest.debug("DROP: ",dump(drop:get_luaentity()))
-            end
-        end
-    end,
     mine = function(turtle, nodeLocation)
         if nodeLocation == nil then return false end
         local node = minetest.get_node(nodeLocation)
         if (node.name=="air") then return false end
         --Try sucking the inventory (in case it's a chest)
         turtle:suckBlock(nodeLocation)
-        --NOTE I have to dig the node then pick up the items, since dig_node is (I think) the only way to abide by spawn protection
-        if minetest.dig_node(nodeLocation) then
-            turtle:suckDrops(nodeLocation)
-            turtle:yield("Mining")
-            return true
+        local drops = minetest.get_node_drops(node)
+        --NOTE This violates spawn protection, but I know of no way to mine that abides by spawn protection AND picks up all items and contents (dig_node drops items and I don't know how to pick them up)
+        minetest.remove_node(nodeLocation)
+        for _, iteminfo in pairs(drops) do
+            local stack = ItemStack(iteminfo)
+            if turtle.inv:room_for_item("main",stack) then
+                turtle.inv:add_item("main",stack)
+            end
         end
-        return false --Un diggable (such as spawn protection)
+        turtle:yield("Mining")
+        return true
     end,
 --    MAIN TURTLE INTERFACE    ---------------------------------------
     yield = function(turtle,reason) if (coroutine.running() == turtle.coroutine) then coroutine.yield(reason) end end,
