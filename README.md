@@ -1,8 +1,9 @@
-![Computertest](banner.png)
-
 # Computertest
 
 A ComputerCraft-inspired mod for Minetest!
+
+![Computertest](banner.png)
+
 
 ## Working Features
 
