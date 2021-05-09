@@ -1,6 +1,7 @@
 computertest = {
     config = {
-        globalstep_interval = 0.5,
+        --Turtles are yielded after calling long events, and resumed this often (in seconds)
+        turtle_tick = 0.5,
     },
     turtles = {},
     num_turtles = 0,

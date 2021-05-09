@@ -17,7 +17,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         elseif (fields.open_terminal=="Open Terminal") then
             minetest.show_formspec(player:get_player_name(),FORMNAME_TURTLE_TERMINAL..id,turtle:get_formspec_terminal());
         elseif (fields.factory_reset=="Factory Reset") then
-            minetest.debug("Stop Code")
             return not turtle:upload_code_to_turtle("",false)
         end
     elseif isForm(FORMNAME_TURTLE_TERMINAL) then
@@ -110,8 +109,6 @@ minetest.register_entity("computertest:turtle", {
         turtle.codeUncompiled = code_string
         turtle.coroutine = nil
         turtle.code = sandbox(turtle.codeUncompiled)
-        minetest.debug("Stop Code2",dump(turtle))
-
         if (run_for_result) then
             --TODO run subroutine once, if it returns a value, return that here
             return "Ran"
@@ -160,7 +157,7 @@ minetest.register_entity("computertest:turtle", {
         minetest.debug("Deleting all data of turtle")
     end,
     turtle_move_withHeading = function (turtle,numForward,numRight,numUp)
-        local new_pos = turtle:getNearbyPos(numForward,numRight,numUp)
+        local new_pos = turtle:get_nearby_pos(numForward,numRight,numUp)
         --Verify new pos is empty
         if (new_pos == nil or minetest.get_node(new_pos).name~="air") then
             turtle:yield("Moving")
@@ -171,8 +168,8 @@ minetest.register_entity("computertest:turtle", {
         turtle:yield("Moving")
         return true
     end,
-    getNearbyPos = function(turtle, numForward, numRight, numUp)
-        local pos = turtle.object:get_pos()
+    get_nearby_pos = function(turtle, numForward, numRight, numUp)
+        local pos = turtle:get_loc()
         if pos==nil then return nil end -- To prevent unloaded turtles from trying to load things
         local new_pos = vector.new(pos)
         if turtle:get_heading()%4==0 then new_pos.z=pos.z-numForward;new_pos.x=pos.x-numRight; end
@@ -182,47 +179,79 @@ minetest.register_entity("computertest:turtle", {
         new_pos.y = pos.y + (numUp or 0)
         return new_pos
     end,
-    mine = function(turtle, nodeLocation)
-        if nodeLocation == nil then
-            turtle:yield("Mining")
-            return false
+    --[[    Sucks inventory (chest, node, furnace, etc) at nodeLocation into turtle
+    @returns true if it sucked everything up]]
+    suckBlock = function(turtle, nodeLocation)
+        local suckedEverything = true
+        local nodeInventory = minetest.get_inventory({type="node", pos=nodeLocation})
+        if not nodeInventory then
+            return false --No node inventory
         end
-        local node = minetest.get_node(nodeLocation)
-        if (node.name=="air") then return false end
-        local drops = minetest.get_node_drops(node)
-        minetest.remove_node(nodeLocation)
-        for _, iteminfo in ipairs(drops) do
-            local stack = ItemStack(iteminfo)
-            --minetest.log("dropping "..stack:get_count().."x "..itemname)
-            if turtle.inv:room_for_item("main",stack) then
-                turtle.inv:add_item("main",stack)
-            else
-                minetest.log("Totally deleted not-picked-up item")
+        for listName,listStacks in pairs(nodeInventory:get_lists()) do
+            for stackI,itemStack in pairs(listStacks) do
+                if turtle.inv:room_for_item("main",itemStack) then
+                    local remainingItemStack = turtle.inv:add_item("main",itemStack)
+                    nodeInventory:set_stack(listName, stackI, remainingItemStack)
+                else
+                    suckedEverything = false
+                end
             end
         end
-        turtle:yield("Mining")
-        return true
+        return suckedEverything
+    end,
+    --[[    Sucks drops from ground (from mining, spitting out, etc) at nodeLocation into turtle
+    @returns true if it sucked everything up]]
+    suckDrops = function(turtle, nodeLocation)
+        local drops = minetest.get_objects_inside_radius(nodeLocation,1)
+        for i,drop in pairs(drops) do
+            if drop.get_luaentity then
+                --TODO this doesn't seem to be possible
+                --minetest.debug("DROP: ",dump(drop:get_luaentity()))
+            end
+        end
+    end,
+    mine = function(turtle, nodeLocation)
+        if nodeLocation == nil then return false end
+        local node = minetest.get_node(nodeLocation)
+        if (node.name=="air") then return false end
+        --Try sucking the inventory (in case it's a chest)
+        turtle:suckBlock(nodeLocation)
+        --NOTE I have to dig the node then pick up the items, since dig_node is (I think) the only way to abide by spawn protection
+        if minetest.dig_node(nodeLocation) then
+            turtle:suckDrops(nodeLocation)
+            turtle:yield("Mining")
+            return true
+        end
+        return false --Un diggable (such as spawn protection)
     end,
 --    MAIN TURTLE INTERFACE    ---------------------------------------
     yield = function(turtle,reason) if (coroutine.running() == turtle.coroutine) then coroutine.yield(reason) end end,
-    moveForward = function(turtle)  turtle:turtle_move_withHeading( 1, 0, 0) end,
-    moveBackward = function(turtle) turtle:turtle_move_withHeading(-1, 0, 0) end,
-    moveRight = function(turtle)    turtle:turtle_move_withHeading( 0, 1, 0) end,
-    moveLeft = function(turtle)     turtle:turtle_move_withHeading( 0,-1, 0) end,
-    moveUp = function(turtle)       turtle:turtle_move_withHeading( 0, 0, 1) end,
-    moveDown = function(turtle)     turtle:turtle_move_withHeading( 0, 0,-1) end,
-    turnLeft = function(turtle)     turtle:set_heading(turtle:get_heading()+1) end,
-    turnRight = function(turtle)    turtle:set_heading(turtle:get_heading()-1) end,
-    mineForward = function(turtle)  turtle:mine(turtle:getNearbyPos(1,0,0)) end,
-    mineUp = function(turtle)       turtle:mine(turtle:getNearbyPos(0,0,1)) end,
-    mineDown = function(turtle)     turtle:mine(turtle:getNearbyPos(0,0,-1)) end,
---    MAIN TURTLE INTERFACE END---------------------------------------
+
+    moveForward = function(turtle)  return turtle:turtle_move_withHeading( 1, 0, 0) end,
+    moveBackward = function(turtle) return turtle:turtle_move_withHeading(-1, 0, 0) end,
+    moveRight = function(turtle)    return turtle:turtle_move_withHeading( 0, 1, 0) end,
+    moveLeft = function(turtle)     return turtle:turtle_move_withHeading( 0,-1, 0) end,
+    moveUp = function(turtle)       return turtle:turtle_move_withHeading( 0, 0, 1) end,
+    moveDown = function(turtle)     return turtle:turtle_move_withHeading( 0, 0,-1) end,
+
+    turnLeft = function(turtle)     return turtle:set_heading(turtle:get_heading()+1) end,
+    turnRight = function(turtle)    return turtle:set_heading(turtle:get_heading()-1) end,
+
+    mineForward = function(turtle)  return turtle:mine(turtle:get_nearby_pos    (1,0,0)) end,
+    mineBackward = function(turtle)  return turtle:mine(turtle:get_nearby_pos   (-1,0,0)) end,
+    mineRight = function(turtle)  return turtle:mine(turtle:get_nearby_pos      (0,1,0)) end,
+    mineLeft = function(turtle)  return turtle:mine(turtle:get_nearby_pos       (0,-1,0)) end,
+    mineUp = function(turtle)  return turtle:mine(turtle:get_nearby_pos         (0,0,1)) end,
+    mineDown = function(turtle)  return turtle:mine(turtle:get_nearby_pos       (0,0,-1)) end,
+
+    get_loc = function(turtle)      return turtle.object:get_pos() end,
+    --    MAIN TURTLE INTERFACE END---------------------------------------
 })
 
 local timer = 0
 minetest.register_globalstep(function(dtime)
     timer = timer + dtime
-    if (timer >= computertest.config.globalstep_interval) then
+    if (timer >= computertest.config.turtle_tick) then
         for _,turtle in pairs(computertest.turtles) do
             if turtle.coroutine then
                 if coroutine.status(turtle.coroutine)=="suspended" then
@@ -243,6 +272,6 @@ minetest.register_globalstep(function(dtime)
                 --minetest.log("turtle #"..id.." has no coroutine or code, who cares...")
             end
         end
-        timer = timer - computertest.config.globalstep_interval
+        timer = timer - computertest.config.turtle_tick
     end
 end)
