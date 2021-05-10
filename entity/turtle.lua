@@ -45,6 +45,36 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
     end
     return true--Known formname, input processed "If function returns `true`, remaining functions are not called"
 end)
+
+--Code responsible for updating turtles every turtle_tick
+local timer = 0
+minetest.register_globalstep(function(dtime)
+    timer = timer + dtime
+    if (timer >= computertest.config.turtle_tick) then
+        for _,turtle in pairs(computertest.turtles) do
+            if turtle.coroutine then
+                if coroutine.status(turtle.coroutine)=="suspended" then
+                    --TODO check for fuel here
+                    local status, result = coroutine.resume(turtle.coroutine)
+                    minetest.log("coroutine stat "..dump(status).." said "..dump(result))
+                    --elseif coroutine.status(turtle.coroutine)=="dead" then
+                    --minetest.log("turtle #"..id.." has coroutine, but it's already done running")
+                end
+            elseif turtle.code then
+                --minetest.log("turtle #"..id.." has no coroutine but has code! Making coroutine...")
+                --TODO add some kinda timeout into coroutine
+                turtle.coroutine = coroutine.create(function()
+                    turtle.code()
+                    init(turtle)
+                end)
+                --else
+                --minetest.log("turtle #"..id.." has no coroutine or code, who cares...")
+            end
+        end
+        timer = timer - computertest.config.turtle_tick
+    end
+end)
+--Code responsible for generating turtle entity and turtle interface
 minetest.register_entity("computertest:turtle", {
     initial_properties = {
         hp_max = 1,
@@ -116,14 +146,13 @@ minetest.register_entity("computertest:turtle", {
         return turtle.code ~= nil
     end,
     --MAIN END TURTLE USER INTERFACE------------------------------------------
-
     --- From 0 to 3
     set_heading = function(turtle,heading)
         heading = (tonumber(heading) or 0)%4
         if turtle.heading ~= heading then
             turtle.heading = heading
             turtle.object:set_yaw(turtle.heading * 3.14159265358979323/2)
-            if (coroutine.running() == turtle.coroutine) then turtle:yield("Turning") end
+            if (coroutine.running() == turtle.coroutine) then turtle:yield("Turning",true) end
         end
     end,
     get_heading = function(self)
@@ -137,6 +166,7 @@ minetest.register_entity("computertest:turtle", {
         self.heading = 0
         self.previous_answers = {}
         self.coroutine = nil
+        self.fuel = 100
         --Give her an inventory
         self.inv_name = "computertest:turtle:"..self.id
         self.inv_fullname = "detached:"..self.inv_name
@@ -160,16 +190,16 @@ minetest.register_entity("computertest:turtle", {
         local new_pos = turtle:get_nearby_pos(numForward,numRight,numUp)
         --Verify new pos is empty
         if (new_pos == nil or minetest.get_node(new_pos).name~="air") then
-            turtle:yield("Moving")
+            turtle:yield("Moving",true)
             return false
         end
         --Take Action
         turtle.object:set_pos(new_pos)
-        turtle:yield("Moving")
+        turtle:yield("Moving",true)
         return true
     end,
     get_nearby_pos = function(turtle, numForward, numRight, numUp)
-        local pos = turtle:get_loc()
+        local pos = turtle:get_pos()
         if pos==nil then return nil end -- To prevent unloaded turtles from trying to load things
         local new_pos = vector.new(pos)
         if turtle:get_heading()%4==0 then new_pos.z=pos.z-numForward;new_pos.x=pos.x-numRight; end
@@ -179,6 +209,59 @@ minetest.register_entity("computertest:turtle", {
         new_pos.y = pos.y + (numUp or 0)
         return new_pos
     end,
+    mine = function(turtle, nodeLocation)
+        if nodeLocation == nil then return false end
+        local node = minetest.get_node(nodeLocation)
+        if (node.name=="air") then return false end
+        --Try sucking the inventory (in case it's a chest)
+        turtle:suckBlock(nodeLocation)
+        local drops = minetest.get_node_drops(node)
+        --NOTE This violates spawn protection, but I know of no way to mine that abides by spawn protection AND picks up all items and contents (dig_node drops items and I don't know how to pick them up)
+        minetest.remove_node(nodeLocation)
+        for _, iteminfo in pairs(drops) do
+            local stack = ItemStack(iteminfo)
+            if turtle.inv:room_for_item("main",stack) then
+                turtle.inv:add_item("main",stack)
+            end
+        end
+        turtle:yield("Mining",true)
+        return true
+    end,
+    useFuel = function(turtle)
+        if turtle.fuel > 0 then
+            turtle.fuel = turtle.fuel - 1;
+        end
+    end,
+--    MAIN TURTLE INTERFACE    ---------------------------------------
+    yield = function(turtle,reason,useFuel)
+        -- Yield at least once
+        if (coroutine.running() == turtle.coroutine) then
+            coroutine.yield(reason)
+        end
+        --Use a fuel if requested
+        if useFuel then turtle:useFuel() end
+    end,
+
+    moveForward = function(turtle)  return turtle:turtle_move_withHeading( 1, 0, 0) end,
+    moveBackward = function(turtle) return turtle:turtle_move_withHeading(-1, 0, 0) end,
+    moveRight = function(turtle)    return turtle:turtle_move_withHeading( 0, 1, 0) end,
+    moveLeft = function(turtle)     return turtle:turtle_move_withHeading( 0,-1, 0) end,
+    moveUp = function(turtle)       return turtle:turtle_move_withHeading( 0, 0, 1) end,
+    moveDown = function(turtle)     return turtle:turtle_move_withHeading( 0, 0,-1) end,
+
+    turnLeft = function(turtle)     return turtle:set_heading(turtle:get_heading()+1) end,
+    turnRight = function(turtle)    return turtle:set_heading(turtle:get_heading()-1) end,
+
+    mineForward = function(turtle)  return turtle:mine(turtle:get_nearby_pos    (1,0,0)) end,
+    mineBackward = function(turtle)  return turtle:mine(turtle:get_nearby_pos   (-1,0,0)) end,
+    mineRight = function(turtle)  return turtle:mine(turtle:get_nearby_pos      (0,1,0)) end,
+    mineLeft = function(turtle)  return turtle:mine(turtle:get_nearby_pos       (0,-1,0)) end,
+    mineUp = function(turtle)  return turtle:mine(turtle:get_nearby_pos         (0,0,1)) end,
+    mineDown = function(turtle)  return turtle:mine(turtle:get_nearby_pos       (0,0,-1)) end,
+
+    get_pos = function(turtle)      return turtle.object:get_pos() end,
+    get_fuel = function(turtle) return turtle.fuel end,
+
     --[[    Sucks inventory (chest, node, furnace, etc) at nodeLocation into turtle
     @returns true if it sucked everything up]]
     suckBlock = function(turtle, nodeLocation)
@@ -199,72 +282,36 @@ minetest.register_entity("computertest:turtle", {
         end
         return suckedEverything
     end,
-    mine = function(turtle, nodeLocation)
-        if nodeLocation == nil then return false end
-        local node = minetest.get_node(nodeLocation)
-        if (node.name=="air") then return false end
-        --Try sucking the inventory (in case it's a chest)
-        turtle:suckBlock(nodeLocation)
-        local drops = minetest.get_node_drops(node)
-        --NOTE This violates spawn protection, but I know of no way to mine that abides by spawn protection AND picks up all items and contents (dig_node drops items and I don't know how to pick them up)
-        minetest.remove_node(nodeLocation)
-        for _, iteminfo in pairs(drops) do
-            local stack = ItemStack(iteminfo)
-            if turtle.inv:room_for_item("main",stack) then
-                turtle.inv:add_item("main",stack)
-            end
-        end
-        turtle:yield("Mining")
-        return true
+
+    -- MAIN INVENTORY COMMANDS--------------------------
+    itemDrop = function(turtle,itemslot)
+    --    TODO drops item onto ground
     end,
---    MAIN TURTLE INTERFACE    ---------------------------------------
-    yield = function(turtle,reason) if (coroutine.running() == turtle.coroutine) then coroutine.yield(reason) end end,
+    itemGet = function(turtle,itemslot)
+        --    TODO returns itemstack in itemslot, along with quantity
+    end,
+    itemMove = function(turtle, itemslotA, itemslotB)
+        --    TODO swap itemstacks in slots A and B
+    end,
+    itemPush = function(turtle, itemslot, listname)
+        listname = listname or "main"
+        --    TODO Pushes item into forward-facing chest
+        --    TODO after getting this working, add a general function with whitelists
+    end,
+    itemCraft = function(turtle,itemslotResult)
+        --    TODO craft using top right 3x3 grid, and put result in itemslotResult
+    end,
+    itemRefuel = function(turtle,itemslot)
+        local burntime = 0--TODO get burntime
+--        If fuels are defined like this, how do I get the burntime back, given an item?
+--[[        minetest.register_craft("",{
+            type = "fuel",
+            recipe = "bucket:bucket_lava",
+            burntime = 60,
+            replacements = {{"bucket:bucket_lava", "bucket:bucket_empty"}},
+        })]]
 
-    moveForward = function(turtle)  return turtle:turtle_move_withHeading( 1, 0, 0) end,
-    moveBackward = function(turtle) return turtle:turtle_move_withHeading(-1, 0, 0) end,
-    moveRight = function(turtle)    return turtle:turtle_move_withHeading( 0, 1, 0) end,
-    moveLeft = function(turtle)     return turtle:turtle_move_withHeading( 0,-1, 0) end,
-    moveUp = function(turtle)       return turtle:turtle_move_withHeading( 0, 0, 1) end,
-    moveDown = function(turtle)     return turtle:turtle_move_withHeading( 0, 0,-1) end,
-
-    turnLeft = function(turtle)     return turtle:set_heading(turtle:get_heading()+1) end,
-    turnRight = function(turtle)    return turtle:set_heading(turtle:get_heading()-1) end,
-
-    mineForward = function(turtle)  return turtle:mine(turtle:get_nearby_pos    (1,0,0)) end,
-    mineBackward = function(turtle)  return turtle:mine(turtle:get_nearby_pos   (-1,0,0)) end,
-    mineRight = function(turtle)  return turtle:mine(turtle:get_nearby_pos      (0,1,0)) end,
-    mineLeft = function(turtle)  return turtle:mine(turtle:get_nearby_pos       (0,-1,0)) end,
-    mineUp = function(turtle)  return turtle:mine(turtle:get_nearby_pos         (0,0,1)) end,
-    mineDown = function(turtle)  return turtle:mine(turtle:get_nearby_pos       (0,0,-1)) end,
-
-    get_loc = function(turtle)      return turtle.object:get_pos() end,
+        turtle.fuel = turtle.fuel + burntime * computertest.config.fuel_multiplier
+    end,
     --    MAIN TURTLE INTERFACE END---------------------------------------
 })
-
-local timer = 0
-minetest.register_globalstep(function(dtime)
-    timer = timer + dtime
-    if (timer >= computertest.config.turtle_tick) then
-        for _,turtle in pairs(computertest.turtles) do
-            if turtle.coroutine then
-                if coroutine.status(turtle.coroutine)=="suspended" then
-                    --minetest.log("turtle #"..id.." has suspended/new coroutine!")
-                    local status, result = coroutine.resume(turtle.coroutine)
-                    minetest.log("coroutine stat "..dump(status).." said "..dump(result))
-                --elseif coroutine.status(turtle.coroutine)=="dead" then
-                    --minetest.log("turtle #"..id.." has coroutine, but it's already done running")
-                end
-            elseif turtle.code then
-                --minetest.log("turtle #"..id.." has no coroutine but has code! Making coroutine...")
-                --TODO add some kinda timeout into coroutine
-                turtle.coroutine = coroutine.create(function()
-                    turtle.code()
-                    init(turtle)
-                end)
-            --else
-                --minetest.log("turtle #"..id.." has no coroutine or code, who cares...")
-            end
-        end
-        timer = timer - computertest.config.turtle_tick
-    end
-end)

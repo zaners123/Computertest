@@ -22,5 +22,6 @@ function init(turtle)
     turtle:mineUp()
     turtle:mineDown()
     ---Informational commands happen instantly (don't yield)
-    turtle:get_loc()--Returns something like {x = -277,y = 6,z = -1558}
+    turtle:get_pos()--Returns something like {x = -277,y = 6,z = -1558}
+    ---More turtle commands can be viewed in entity/turtle.lua (only use the ones in the interface)
 end
