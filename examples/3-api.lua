@@ -1,4 +1,6 @@
 
+-- Generally speaking, "do action" functions return true on success and false on failure
+
 function init(turtle)
     ---Yield waits one "turtle_tick"
     turtle:yield()
@@ -24,4 +26,6 @@ function init(turtle)
     ---Informational commands happen instantly (don't yield)
     turtle:get_pos()--Returns something like {x = -277,y = 6,z = -1558}
     ---More turtle commands can be viewed in entity/turtle.lua (only use the ones in the interface)
+
+    ---For inventory commands, remember that lua starts from one (itemslots go from 1-16)
 end

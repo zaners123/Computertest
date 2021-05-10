@@ -2,8 +2,11 @@
 local FORMNAME_TURTLE_INVENTORY = "computertest:turtle:inventory:"
 local FORMNAME_TURTLE_TERMINAL  = "computertest:turtle:terminal:"
 local FORMNAME_TURTLE_UPLOAD    = "computertest:turtle:upload:"
+local TURTLE_INVENTORYSIZE = 4*4
 
 local function getTurtle(id) return computertest.turtles[id] end
+local function isValidInventoryIndex(index) return 0 < index and index <= TURTLE_INVENTORYSIZE end
+
 minetest.register_on_player_receive_fields(function(player, formname, fields)
     local function isForm(name)
         return string.sub(formname,1,string.len(name))==name
@@ -158,25 +161,25 @@ minetest.register_entity("computertest:turtle", {
     get_heading = function(self)
         return self.heading
     end,
-    on_activate = function(self, staticdata, dtime_s)
+    on_activate = function(turtle, staticdata, dtime_s)
         --TODO use staticdata to load previous state, such as inventory and whatnot
         --Give ID
         computertest.num_turtles = computertest.num_turtles+1
-        self.id = computertest.num_turtles
-        self.heading = 0
-        self.previous_answers = {}
-        self.coroutine = nil
-        self.fuel = 100
+        turtle.id = computertest.num_turtles
+        turtle.heading = 0
+        turtle.previous_answers = {}
+        turtle.coroutine = nil
+        turtle.fuel = 100
         --Give her an inventory
-        self.inv_name = "computertest:turtle:"..self.id
-        self.inv_fullname = "detached:"..self.inv_name
-        local inv = minetest.create_detached_inventory(self.inv_name,{})
+        turtle.inv_name = "computertest:turtle:".. turtle.id
+        turtle.inv_fullname = "detached:".. turtle.inv_name
+        local inv = minetest.create_detached_inventory(turtle.inv_name,{})
         if inv == nil or inv == false then error("Could not spawn inventory")end
-        inv:set_size("main", 4*4)
-        if self.inv ~= nil then inv.set_lists(self.inv) end
-        self.inv = inv
+        inv:set_size("main", TURTLE_INVENTORYSIZE)
+        if turtle.inv ~= nil then inv.set_lists(turtle.inv) end
+        turtle.inv = inv
         -- Add to turtle list
-        computertest.turtles[self.id] = self
+        computertest.turtles[turtle.id] = turtle
     end,
     on_rightclick = function(self, clicker)
         if not clicker or not clicker:is_player() then return end
@@ -284,22 +287,43 @@ minetest.register_entity("computertest:turtle", {
     end,
 
     -- MAIN INVENTORY COMMANDS--------------------------
+    ---    TODO drops item onto ground
     itemDrop = function(turtle,itemslot)
-    --    TODO drops item onto ground
     end,
+    --- TODO Returns ItemStack on success or nil on failure
+    ---Ex: turtle:itemGet(3):get_name() -> "default:stone"
     itemGet = function(turtle,itemslot)
-        --    TODO returns itemstack in itemslot, along with quantity
+        if isValidInventoryIndex(itemslot) then
+            return turtle.inv:get_stack("main",itemslot)
+        end
+        return nil
     end,
+    ---    Swaps itemstacks in slots A and B
     itemMove = function(turtle, itemslotA, itemslotB)
-        --    TODO swap itemstacks in slots A and B
+        if (not isValidInventoryIndex(itemslotA)) or (not isValidInventoryIndex(itemslotB)) then
+            turtle:yield("Inventorying")
+            return false
+        end
+
+        local stackA = turtle.inv:get_stack("main",itemslotA)
+        local stackB = turtle.inv:get_stack("main",itemslotB)
+
+        minetest.debug(dump(stackA:to_string()))
+        minetest.debug(dump(stackB:to_string()))
+
+        turtle.inv:set_stack("main",itemslotA,stackB)
+        turtle.inv:set_stack("main",itemslotB,stackA)
+
+        turtle:yield("Inventorying")
+        return true
     end,
+    ---    TODO Pushes item into forward-facing chest
+    ---    TODO after getting this working, add a general function with whitelists
     itemPush = function(turtle, itemslot, listname)
         listname = listname or "main"
-        --    TODO Pushes item into forward-facing chest
-        --    TODO after getting this working, add a general function with whitelists
     end,
+    ---    TODO craft using top right 3x3 grid, and put result in itemslotResult
     itemCraft = function(turtle,itemslotResult)
-        --    TODO craft using top right 3x3 grid, and put result in itemslotResult
     end,
     itemRefuel = function(turtle,itemslot)
         local burntime = 0--TODO get burntime
