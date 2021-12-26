@@ -11,3 +11,6 @@ computertest = {
 local modpath = minetest.get_modpath("computertest")
 dofile(modpath.."/block/turtle.lua")
 dofile(modpath.."/entity/turtle.lua")
+minetest.register_privilege("computertest", {
+    description = "DANGEROUS: User can script on turtles. Only give to trusted users.",
+})

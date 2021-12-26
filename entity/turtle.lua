@@ -1,17 +1,22 @@
 
 local FORMNAME_TURTLE_INVENTORY = "computertest:turtle:inventory:"
+local FORMNAME_TURTLE_NOPRIV    = "computertest:turtle:nopriv:"
 local FORMNAME_TURTLE_TERMINAL  = "computertest:turtle:terminal:"
 local FORMNAME_TURTLE_UPLOAD    = "computertest:turtle:upload:"
+
+local FORM_NOPRIV = "size[9,1;]label[0,0;You do not have the 'computertest' privilege.\nThis is required for interacting with turtles.]";
+
 local TURTLE_INVENTORYSIZE = 4*4
 
 local function getTurtle(id) return computertest.turtles[id] end
 local function isValidInventoryIndex(index) return 0 < index and index <= TURTLE_INVENTORYSIZE end
+local function has_computertest_priv(player) return minetest.check_player_privs(player,"computertest") end
 
 minetest.register_on_player_receive_fields(function(player, formname, fields)
     local function isForm(name)
         return string.sub(formname,1,string.len(name))==name
     end
-    --minetest.debug("FORM SUBMITTED",dump(formname),dump(fields))
+    --minetest.debug("FORM SUBMITTED",dump(player),dump(formname),dump(fields))
     if isForm(FORMNAME_TURTLE_INVENTORY) then
         local id = tonumber(string.sub(formname,1+string.len(FORMNAME_TURTLE_INVENTORY)))
         local turtle = getTurtle(id)
@@ -20,7 +25,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         elseif (fields.open_terminal=="Open Terminal") then
             minetest.show_formspec(player:get_player_name(),FORMNAME_TURTLE_TERMINAL..id,turtle:get_formspec_terminal());
         elseif (fields.factory_reset=="Factory Reset") then
-            return not turtle:upload_code_to_turtle("",false)
+            return not turtle:upload_code_to_turtle(player,"",false)
         end
     elseif isForm(FORMNAME_TURTLE_TERMINAL) then
         if (fields.terminal_out ~= nil) then return true end
@@ -30,7 +35,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         local command = fields.terminal_in
         if command==nil or command=="" then return nil end
         command = "function init(turtle) return "..command.." end"
-        local commandResult = turtle:upload_code_to_turtle(command, true)
+        local commandResult = turtle:upload_code_to_turtle(player,command, true)
         if (commandResult==nil) then
             minetest.close_formspec(player:get_player_name(),FORMNAME_TURTLE_TERMINAL..id)
             return true
@@ -42,7 +47,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         local id = tonumber(string.sub(formname,1+string.len(FORMNAME_TURTLE_UPLOAD)))
         if (fields.button_upload == nil or fields.upload == nil) then return true end
         local turtle = getTurtle(id)
-        return not turtle:upload_code_to_turtle(fields.upload,false)
+        return not turtle:upload_code_to_turtle(player,fields.upload,false)
     else
         return false--Unknown formname, input not processed
     end
@@ -132,7 +137,15 @@ minetest.register_entity("computertest:turtle", {
                 .."textarea[0,1;12,8;upload;;"..minetest.formspec_escape(turtle.codeUncompiled or "").."]"
                 .."set_focus[upload;true]";
     end,
-    upload_code_to_turtle = function(turtle, code_string,run_for_result)
+    ---
+    ---@return true on success
+    ---
+    upload_code_to_turtle = function(turtle,player, code_string,run_for_result)
+        --Check permissions
+        if (not has_computertest_priv(player)) then
+            --minetest.debug(player:get_player_name().." does not have computertest priv")
+            return false
+        end
         local function sandbox(code)
             --TODO sandbox this!
             --Currently returns function that defines init and loop. In the future, this should probably just initialize it using some callbacks
@@ -183,7 +196,13 @@ minetest.register_entity("computertest:turtle", {
     end,
     on_rightclick = function(self, clicker)
         if not clicker or not clicker:is_player() then return end
-        minetest.show_formspec(clicker:get_player_name(), FORMNAME_TURTLE_INVENTORY.. self.id, self:get_formspec_inventory())
+        if (not has_computertest_priv(clicker)) then
+            minetest.show_formspec(clicker:get_player_name(),FORMNAME_TURTLE_NOPRIV,FORM_NOPRIV);
+            return
+        end
+
+        minetest.show_formspec(clicker:get_player_name(), FORMNAME_TURTLE_INVENTORY.. self.id,
+                self:get_formspec_inventory())
     end,
     get_staticdata = function(self)
     --    TODO convert inventory and internal code to string and back somehow, or else it'll be deleted every time the entity gets unloaded
