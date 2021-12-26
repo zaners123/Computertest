@@ -2,6 +2,7 @@
     The turtle block is only used to spawn the turtle entity, then it deletes itself
 ]]
 minetest.register_node("computertest:turtle", {
+    description = "Turtle",
     tiles = {
         "computertest_top.png",
         "computertest_bottom.png",
@@ -21,8 +22,8 @@ minetest.register_node("computertest:turtle", {
 minetest.register_craft({
     output = 'computertest:turtle',
     recipe = {
-        {'default:dirt', '', ''},
-        {            '', '', ''},
-        {            '', '', ''},
+        {'default:steel_ingot', 'default:steel_ingot', 'default:steel_ingot'},
+        {'default:steel_ingot', 'default:chest',       'default:steel_ingot'},
+        {'default:steel_ingot', 'default:mese',        'default:steel_ingot'},
     }
 })
