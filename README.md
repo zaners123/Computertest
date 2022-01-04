@@ -6,10 +6,10 @@ A ComputerCraft-inspired mod for Minetest!
 
 ## Working Features
 
-- LUA can be uploaded and ran on a turtle (see [/examples]())
-- Actions like mining, moving and turning the turtle
-- Turtles take time to do actions such as moving,mining,turning,etc
+- LUA can be uploaded and ran on a turtle. See the [API](API.md) and the [examples](/examples/EXAMPLES.md)
+- The turtle can do actions like mining, moving, turning, inventory management, and more!
 - A "computertest" privilege, to limit turtle usage to trusted users (so only users with this privilege can use/edit turtles) 
+- Turtles consume fuel after completing hard actions such as mining (configurable)
 
 ## An example of how to use this mod
 
@@ -39,16 +39,15 @@ end
 
 ## Other Information
 
-The API.md contains important documentation for programming.
+The [API.md](API.md) contains important documentation for programming.
 
-EXAMPLES.md contains some fun examples 
+[EXAMPLES.md](examples/EXAMPLES.md) contains some fun examples 
 
 ## Changes are Welcome!
 
-Anyone interested in adding these features can try in entity/turtle.lua, I'd be interested in any great working pull requests!
+Anyone interested in adding these features can! in entity/turtle.lua, I'd be interested in any great working pull requests!
 
 ### Features to Add
 
-- Add dumping into chests to create fully-auto mining
-- Inventory management commands, such as crafting, sorting, and dropping
+- Inventory management commands, such as crafting and sorting
 - The turtle code isn't sandboxed, so turtles could call dangerous functions. This has been mitigated by the "computertest" privilege, but proper sandboxing would work best.
