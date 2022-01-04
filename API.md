@@ -86,20 +86,33 @@ Example: `turtle:buildForward(1)` builds the item in the top-left slot right in 
 - Returns scan result
 
 Returns the node at the given position as table in the format`{name="node_name", param1=0, param2=0}`
+
 Returns `nil` for unloaded areas
+
 Example `turtle:scanLeft().name=='default:stone_with_gold` tells you there's gold ore to your left
 
 ## Inventory/Fuel functions
 
+### `turtle:setAutoRefuel(autoRefuel)`
+
+If your fuel hits zero, with this on, your turtle will consume the first fuel-thing it sees in its inventory
+
 ### `turtle:useFuel()`
 - Uses Fuel
+  
   Burns fuel. Once you run out of fuel, your turtle is stuck.
+
 ### `turtle:getFuel()`
+
 Returns the number actions you can take until needing to refuel.
+
 If this is zero, you won't be able to do much except refuel.
+
 ### `turtle:itemRefuel(turtleslot)`
+
 Takes fuel from this turtleslot and increases the turtle's fuel
 ### `turtle:move[direction]()`
+
 - Yields
 - Uses Fuel
 
