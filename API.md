@@ -74,7 +74,7 @@ The reason can be any string, and is visible in debug.txt (can turn on/off debug
 The turtle will mine the block next to it and take the items of the block. It will take items from chests, too
 They return true if the block was removed
   
-### `turtle:build[direction](turtleslot)
+### `turtle:build[direction](turtleslot)`
 - Returns true if built
 
 Places the block that's in the turtleslot.
@@ -82,7 +82,7 @@ Places the block that's in the turtleslot.
 Example: `turtle:buildForward(1)` builds the item in the top-left slot right in front of the turtle
 
 
-### `turtle:scan[direction]()
+### `turtle:scan[direction]()`
 - Returns scan result
 
 Returns the node at the given position as table in the format`{name="node_name", param1=0, param2=0}`
@@ -105,7 +105,7 @@ Takes fuel from this turtleslot and increases the turtle's fuel
 
 Moves one block in that direction, yields, and consumes fuel
 
-### `turtle:itemPush[direction](filterList, isWhitelist, listname)
+### `turtle:itemPush[direction](filterList, isWhitelist, listname)`
 
 The opposite of itemSuck. Push everything from the turtle's inventory that matches some filter into the nearby block inventory
 Example: `turtle:itemPushRight({"default:coal_lump","wood","tree"},true,'fuel')` takes all coal lumps,wood-group, or tree-group items from the turtle. Puts them into the furnace-to-the-right's fuel slot.
