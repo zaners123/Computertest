@@ -13,6 +13,12 @@ minetest.register_node("computertest:turtle", {
     },
     groups = {oddly_breakable_by_hand=2},
     paramtype2 = "facedir",
+    after_place_node = function(pos, placer)
+        if placer and placer:is_player() then
+            local meta = minetest.get_meta(pos)
+            meta:set_string("owner", placer:get_player_name())
+        end
+    end,
     on_construct = function(pos)
         local turtle = minetest.add_entity(pos,"computertest:turtle")
         turtle = turtle:get_luaentity()

@@ -3,29 +3,21 @@
 
 --See example #1 on how to upload code
 function init(turtle)
-    local size = 3
-    local y=0
-    while y<size do
-        local z=0
-        while z <size do
-            local x=1
-            while x<size do
-                turtle:mineForward()
-                if turtle:moveForward() then x=x+1 end
-            end
-            while x>0 do
-                if turtle:moveBackward() then x=x-1 end
-            end
-            turtle:mineRight()
-            if turtle:moveRight() then z = z +1 end
+    local size = 5
+    local z =0
+    while z <size do
+        local x=0
+        while x<size do
+            turtle:mineForward()
+            if turtle:moveForward() then x=x+1 end
         end
-        while z >0 do
-            if turtle:moveLeft() then z = z -1 end
+        while x>0 do
+            if turtle:moveBackward() then x=x-1 end
         end
-        turtle:mineDown()
-        if turtle:moveDown() then y=y+1 end
+        turtle:mineRight()
+        if turtle:moveRight() then z = z +1 end
     end
-    while y>0 do
-        if turtle:moveUp() then y=y-1 end
+    while z >0 do
+        if turtle:moveLeft() then z = z -1 end
     end
 end
