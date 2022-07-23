@@ -363,8 +363,13 @@ function TurtleEntity:on_activate(staticdata, dtime_s)
     local data = minetest.deserialize(staticdata)
     if type(data) ~= "table" or not data.complete then data = {} end
     --Give ID
-    computertest.num_turtles = computertest.num_turtles+1
-    self.id = computertest.num_turtles
+    if data.id then
+        self.id = data.id
+    else
+        computertest.num_turtles = computertest.num_turtles+1
+        self.id = computertest.num_turtles
+    end
+    
     self.name = data.name or "Unnamed #"..self.id
     --self.owner = minetest.get_meta(pos):get_string("owner")
     self.heading = data.heading or 0
