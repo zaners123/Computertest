@@ -206,10 +206,10 @@ function TurtleEntity:build(nodeLocation, turtleslot)
     if node.name~="air" then return false end
 
     --Build and consume item
-    local stack = self:getTurtleslot("main", turtleslot)
+    local stack = self:getTurtleslot(turtleslot)
     if stack:is_empty() then return false end
-    local newstack, position_placed = minetest.item_place_node(stack, nil, { type="node", under=nodeLocation, above=self:get_pos()})
-    self.inv:set_stack("main", turtleslot,newstack)
+    local newstack, position_placed = minetest.item_place_node(stack, nil, { type="node", under=nodeLocation, above=self.object:get_pos()})
+    self.inv:set_stack("main", turtleslot, newstack)
 
     if position_placed == nil then
         self:yield("Building")
